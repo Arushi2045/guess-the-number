@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guess The Number!</title>
+    <style>
+        /* * --- Aesthetic Color Palette (Mimicking Python Tkinter) --- 
+         * Using CSS variables for easy theme changes.
+         */
+        :root {
+            --bg-primary: #f7f0e8;         /* Very Light Beige/Off-White (Background) */
+            --text-color: #3c403d;         /* Dark Forest Green (Text/Foreground) */
+            --btn-normal: #a2b595;         /* Soft Sage Green (Primary Button) */
+            --btn-hover: #8c9b83;          /* Darker Sage Green */
+            --input-bg: #ffffff;           /* Pure White (Input Background) */
+            --ui-disabled: #d5d8d0;        /* Muted Beige/Gray for disabled controls */
+            --color-loss: #e57373;         /* Soft Red/Coral (Error/Loss) */
+            --color-win: #5cb85c;          /* Calming Vibrant Green (Win/Title Accent) */
+            --font-main: 'Georgia', serif;
+        }
+
+        body {
+            font-family: var(--font-main);
+            background-color: var(--bg-primary);
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        .game-container {
+            width: 450px;
+            padding: 20px;
+            text-align: center;
+            background-color: var(--bg-primary);
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .game-title {
+            font-size: 24pt;
+            font-weight: bold;
+            color: var(--color-win);
+            margin-bottom: 20px;
+        }
+
+        .input-row {
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        label {
+            font-size: 12pt;
+            margin-right: 10px;
+        }
+
+        input[type="text"], input[type="number"] {
+            padding: 8px 10px;
+            font-size: 12pt;
+            background-color: var(--input-bg);
+            color: var(--text-color);
+            border: 1px solid var(--btn-normal);
+            border-radius: 4px;
+            outline: none;
+            transition: border-color 0.3s;
+            /* Hide the blinking cursor for a more 'program' look */
+            caret-color: transparent; 
+        }
+
+        /* Remove number input arrows (spin buttons) for consistency */
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+        /* ------------------------------------------------ */
+
+
+        input[type="text"]:focus, input[type="number"]:focus {
+            border-color: var(--text-color);
+        }
+
+        .game-button {
+            font-family: var(--font-main);
+            cursor: pointer;
+            border: none;
+            border-radius: 4px;
+            padding: 10px 20px;
+            margin: 10px 0;
+            transition: background-color 0.3s;
+        }
+
+        #start-button {
+            font-size: 14pt;
+            font-weight: bold;
+            background-color: var(--btn-normal);
+            color: var(--text-color);
+        }
+
+        #start-button:hover:not(:disabled) {
+            background-color: var(--btn-hover);
+        }
+
+        #guess-button {
+            font-size: 12pt;
+            font-weight: bold;
+            background-color: var(--btn-normal);
+            color: var(--text-color);
+            padding: 8px 15px;
+        }
+
+        #guess-button:hover:not(:disabled) {
+            background-color: var(--btn-hover);
+        }
+
+        .game-button:disabled {
+            background-color: var(--ui-disabled);
+            cursor: not-allowed;
+            color: var(--text-color);
+        }
+
+        .welcome-msg {
+            font-size: 12pt;
+            margin: 10px 0;
+            word-wrap: break-word;
+        }
+
+        .feedback-msg {
+            font-size: 13pt;
+            font-style: italic;
+            margin: 10px 0;
+        }
+
+        .attempts-counter {
+            font-size: 12pt;
+            font-weight: bold;
+            margin: 5px 0 20px 0;
+        }
+
+        .win-text { color: var(--color-win); }
+        .error-text { color: var(--color-loss); }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1 class="game-title" id="title-label">Guess The Number!</h1>
+
+        <div class="input-row" id="name-frame">
+            <label for="name-entry">Your Name:</label>
+            <input type="text" id="name-entry" autofocus>
+        </div>
+
+        <button id="start-button" class="game-button">Start Game</button>
+
+        <p class="welcome-msg" id="welcome-label">Welcome to the Number Guessing Game!</p>
+
+        <div class="input-row" id="guess-frame" style="display: none;">
+            <label for="guess-entry">Your Guess (1-20):</label>
+            <input type="number" id="guess-entry" min="1" max="20">
+        </div>
+
+        <button id="guess-button" class="game-button" disabled>Guess</button>
+
+        <p class="feedback-msg" id="feedback-label">Enter your name and press Start Game.</p>
+        <p class="attempts-counter" id="attempts-label">Attempts: 0 / 10</p>
+    </div>
+
+    <script>
+        // --- Game State Variables ---
+        let targetNumber = 0;
+        let attemptsMade = 0;
+        let currentPlayerName = "";
+        const MAX_ATTEMPTS = 10;
+
+        // --- Element References (using const for DOM elements) ---
+        const nameEntry = document.getElementById('name-entry');
+        const startButton = document.getElementById('start-button');
+        const welcomeLabel = document.getElementById('welcome-label');
+        const feedbackLabel = document.getElementById('feedback-label');
+        const attemptsLabel = document.getElementById('attempts-label');
+        const guessFrame = document.getElementById('guess-frame');
+        const guessEntry = document.getElementById('guess-entry');
+        const guessButton = document.getElementById('guess-button');
+
+        // --- Style Constants (for JS dynamic updates) ---
+        const fgColor = "var(--text-color)";
+        const lossColor = "var(--color-loss)";
+        const winColor = "var(--color-win)";
+        const btnNormal = "var(--btn-normal)";
+        const uiDisabled = "var(--ui-disabled)";
+
+        // --- Utility Functions ---
+
+        /** Updates button state (color/disabled) to ensure consistency. */
+        function setButtonState(button, enabled) {
+            button.disabled = !enabled;
+            button.style.backgroundColor = enabled ? btnNormal : uiDisabled;
+        }
+
+        // --- Game Logic ---
+
+        function startGame() {
+            currentPlayerName = nameEntry.value.trim();
+
+            if (!currentPlayerName) {
+                alert("Please enter your name to start.");
+                nameEntry.focus();
+                return;
+            }
+
+            // Generate a random integer between 1 and 20 (inclusive)
+            targetNumber = Math.floor(Math.random() * 20) + 1; 
+            attemptsMade = 0;
+
+            // Update UI for game start
+            welcomeLabel.textContent = `Hi, ${currentPlayerName}! Guess a number from 1 to 20.`;
+            feedbackLabel.textContent = `You have ${MAX_ATTEMPTS} attempts. Good luck!`;
+            feedbackLabel.style.color = fgColor;
+            attemptsLabel.textContent = `Attempts: ${attemptsMade} / ${MAX_ATTEMPTS}`;
+
+            // Show guess input and enable guess button
+            guessFrame.style.display = 'flex'; 
+            setButtonState(guessButton, true);
+
+            // Disable name input and start button
+            nameEntry.disabled = true;
+            setButtonState(startButton, false);
+
+            guessEntry.focus();
+        }
+
+        function checkGuess() {
+            if (guessButton.disabled) return; 
+
+            const guessStr = guessEntry.value.trim();
+            // Clear input for the next guess immediately
+            guessEntry.value = ""; 
+
+            if (!/^\d+$/.test(guessStr)) {
+                feedbackLabel.textContent = "Invalid input. Please enter a whole number (1-20).";
+                feedbackLabel.style.color = lossColor;
+                guessEntry.focus();
+                return;
+            }
+
+            const guess = parseInt(guessStr, 10);
+
+            if (guess < 1 || guess > 20) {
+                feedbackLabel.textContent = "Number must be between 1 and 20.";
+                feedbackLabel.style.color = lossColor;
+                guessEntry.focus();
+                return;
+            }
+
+            attemptsMade++;
+
+            if (guess === targetNumber) {
+                feedbackLabel.textContent = `🎉 CORRECT! YOU WON!! It took you ${attemptsMade} tries. 🎉`;
+                feedbackLabel.style.color = winColor;
+                endGame();
+            } else if (guess > targetNumber) {
+                feedbackLabel.textContent = "Too high. Try a smaller number.";
+                feedbackLabel.style.color = fgColor;
+            } else {
+                feedbackLabel.textContent = "Too low. Try a larger number.";
+                feedbackLabel.style.color = fgColor;
+            }
+
+            // Check for loss condition
+            if (attemptsMade >= MAX_ATTEMPTS && guess !== targetNumber) {
+                feedbackLabel.textContent = `❌ GAME OVER! The secret number was ${targetNumber}. ❌`;
+                feedbackLabel.style.color = lossColor;
+                endGame();
+            }
+                
+            attemptsLabel.textContent = `Attempts: ${attemptsMade} / ${MAX_ATTEMPTS}`;
+            guessEntry.focus();
+        }
+
+        function endGame() {
+            setButtonState(guessButton, false);
+            guessEntry.disabled = true;
+
+            // Setup Start Button for "Play Again"
+            startButton.textContent = "Play Again";
+            setButtonState(startButton, true);
+
+            // Important: Remove 'startGame' handler and add 'resetGame' handler
+            startButton.removeEventListener('click', startGame);
+            startButton.addEventListener('click', resetGame);
+        }
+
+        function resetGame() {
+            // Reset state
+            targetNumber = 0;
+            attemptsMade = 0;
+
+            // Reset UI
+            welcomeLabel.textContent = "Welcome to the Number Guessing Game!";
+            feedbackLabel.textContent = "Enter your name and press Start Game.";
+            feedbackLabel.style.color = fgColor;
+            attemptsLabel.textContent = "Attempts: 0 / 10";
+            guessEntry.value = "";
+
+            // Reset and configure start button
+            startButton.textContent = "Start Game";
+            startButton.removeEventListener('click', resetGame);
+            startButton.addEventListener('click', startGame);
+            setButtonState(startButton, true);
+
+            // Hide guess input and disable controls
+            guessFrame.style.display = 'none'; 
+            setButtonState(guessButton, false);
+            guessEntry.disabled = false; 
+
+            // Re-enable name input and clear value
+            nameEntry.disabled = false;
+            nameEntry.value = "";
+            nameEntry.focus();
+        }
+
+
+        // --- Initialization and Event Handlers ---
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Initial event listeners
+            startButton.addEventListener('click', startGame);
+            guessButton.addEventListener('click', checkGuess);
+            
+            // Allow 'Enter' key to trigger button actions
+            guessEntry.addEventListener('keyup', (event) => {
+                if (event.key === 'Enter' && !guessButton.disabled) {
+                    checkGuess();
+                }
+            });
+             nameEntry.addEventListener('keyup', (event) => {
+                if (event.key === 'Enter' && !startButton.disabled) {
+                    startGame();
+                }
+            });
+
+            // Initial state cleanup: guess input and button are disabled/hidden
+            guessFrame.style.display = 'none'; 
+            setButtonState(guessButton, false); // Ensures initial disabled state matches style
+        });
+    </script>
+</body>
+</html>
